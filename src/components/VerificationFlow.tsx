@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageSquare, Check, ChevronRight, ArrowRight } from 'lucide-react';
+import { Mail, MessageSquare, Check, ArrowRight } from 'lucide-react';
 import { verifyEmailCode, verifySmsCode, updateTierBasedOnVerification } from '../lib/verification';
 import { EmailVerification } from './EmailVerification';
 import { SmsVerification } from './SmsVerification';
@@ -8,9 +8,10 @@ interface VerificationFlowProps {
   email: string;
   phone: string;
   onComplete: () => void;
+  deliveryNotice?: string | null;
 }
 
-export function VerificationFlow({ email, phone, onComplete }: VerificationFlowProps) {
+export function VerificationFlow({ email, phone, onComplete, deliveryNotice }: VerificationFlowProps) {
   const [emailVerified, setEmailVerified] = useState(false);
   const [smsVerified, setSmsVerified] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,9 @@ export function VerificationFlow({ email, phone, onComplete }: VerificationFlowP
   useEffect(() => {
     if (emailVerified && (smsVerified || !hasPhone)) {
       setLoading(true);
-      updateTierBasedOnVerification(email).then(() => {
+      updateTierBasedOnVerification(email).catch((error) => {
+        console.error('Failed to update membership tier:', error);
+      }).finally(() => {
         setTimeout(() => {
           onComplete();
         }, 1000);
@@ -47,7 +50,9 @@ export function VerificationFlow({ email, phone, onComplete }: VerificationFlowP
 
   const handleSkipSms = () => {
     setLoading(true);
-    updateTierBasedOnVerification(email).then(() => {
+    updateTierBasedOnVerification(email).catch((error) => {
+      console.error('Failed to update membership tier:', error);
+    }).finally(() => {
       setTimeout(() => {
         onComplete();
       }, 1000);
@@ -56,6 +61,9 @@ export function VerificationFlow({ email, phone, onComplete }: VerificationFlowP
 
   return (
     <div className="space-y-6">
+      {deliveryNotice && (
+        <p role="status" className="p-3 border border-amber-200 bg-amber-50 text-sm text-amber-900">{deliveryNotice}</p>
+      )}
       {hasPhone && (
         <div className="flex justify-between items-center mb-8">
           <div className={`flex items-center gap-2 ${emailVerified ? 'opacity-100' : 'opacity-60'}`}>
@@ -77,7 +85,7 @@ export function VerificationFlow({ email, phone, onComplete }: VerificationFlowP
       )}
 
       {!emailVerified ? (
-        <EmailVerification email={email} onVerify={handleEmailVerify} />
+        <EmailVerification email={email} onVerify={handleEmailVerify} allowImmediateResend={Boolean(deliveryNotice)} />
       ) : (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 animate-slideDown">
           <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -87,7 +95,7 @@ export function VerificationFlow({ email, phone, onComplete }: VerificationFlowP
 
       {hasPhone && !smsVerified ? (
         <>
-          <SmsVerification phone={phone} onVerify={handleSmsVerify} />
+          <SmsVerification phone={phone} onVerify={handleSmsVerify} allowImmediateResend={Boolean(deliveryNotice)} />
           {emailVerified && (
             <button
               onClick={handleSkipSms}

@@ -3,12 +3,21 @@ import { CheckCircle, Copy, Lock } from 'lucide-react';
 import { getUserStats } from '../lib/verification';
 import { Leaderboard } from './Leaderboard';
 
+type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+interface SuccessStats {
+  referral_code: string;
+  tier: Tier;
+  referral_count: number;
+  position: number;
+}
+
 interface SuccessPageProps {
   email: string;
 }
 
 export function SuccessPage({ email }: SuccessPageProps) {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<SuccessStats | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -27,14 +36,18 @@ export function SuccessPage({ email }: SuccessPageProps) {
     loadStats();
   }, [email]);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     const referralLink = `${window.location.origin}?ref=${stats?.referral_code}`;
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy your referral link:', referralLink);
+    }
   };
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="flex gap-1">
@@ -46,18 +59,22 @@ export function SuccessPage({ email }: SuccessPageProps) {
     );
   }
 
+  if (!stats) {
+    return <p className="text-sm text-red-700">We couldn’t load your waitlist details. Please try logging in again.</p>;
+  }
+
   const allBenefits = [
-    { name: 'Early access', requiredTier: 'bronze' },
-    { name: 'Exclusive drops', requiredTier: 'silver' },
-    { name: '20% discount', requiredTier: 'gold' },
-    { name: 'VIP events', requiredTier: 'platinum' },
-    { name: 'Personal stylist', requiredTier: 'platinum' },
+    { name: 'Early access', requiredTier: 'bronze' as Tier },
+    { name: 'Exclusive drops', requiredTier: 'silver' as Tier },
+    { name: '20% discount', requiredTier: 'gold' as Tier },
+    { name: 'VIP events', requiredTier: 'platinum' as Tier },
+    { name: 'Personal stylist', requiredTier: 'platinum' as Tier },
   ];
 
-  const tierHierarchy = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
+  const tierHierarchy: Record<Tier, number> = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
   const currentTierLevel = tierHierarchy[stats.tier];
 
-  const tierInfo = {
+  const tierInfo: Record<Tier, { title: string }> = {
     bronze: { title: 'Bronze' },
     silver: { title: 'Silver' },
     gold: { title: 'Gold' },

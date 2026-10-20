@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { SignupForm } from './components/SignupForm';
 import { LoginForm } from './components/LoginForm';
 import { VerificationFlow } from './components/VerificationFlow';
 import { SuccessPage } from './components/SuccessPage';
+import { isSupabaseConfigured } from './lib/supabase';
 
 type Step = 'signup' | 'login' | 'verification' | 'success';
 
@@ -11,28 +12,19 @@ function App() {
   const [step, setStep] = useState<Step>('signup');
   const [userEmail, setUserEmail] = useState('');
   const [userPhone, setUserPhone] = useState('');
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    const titles = ['Offical Waitlist', 'Nervont: Limited Collections'];
-    let index = 0;
-
-    const interval = setInterval(() => {
-      index = (index + 1) % titles.length;
-      document.title = titles[index];
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleSignupSuccess = (email: string, phone: string) => {
+  const handleSignupSuccess = (email: string, phone: string, notice?: string | null) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setDeliveryNotice(notice ?? null);
     setStep('verification');
   };
 
   const handleLoginSuccess = (email: string, phone: string, emailVerified: boolean, smsVerified: boolean) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setDeliveryNotice(null);
 
     const hasPhone = phone && phone.trim() !== '';
 
@@ -88,7 +80,16 @@ function App() {
 
             <div className="lg:col-span-2 flex flex-col gap-8">
               <div className="bg-white">
-                {step === 'signup' && (
+                {!isSupabaseConfigured ? (
+                  <div className="animate-fadeIn p-4 border border-red-200 bg-red-50">
+                    <h2 className="text-2xl font-light mb-3">Site is not configured</h2>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {import.meta.env.DEV
+                        ? <>Add <code className="text-xs">VITE_SUPABASE_URL</code> and <code className="text-xs">VITE_SUPABASE_ANON_KEY</code> to <code className="text-xs">.env.local</code> in the project root, then restart the dev server.</>
+                        : 'This site is temporarily unavailable. Please try again later.'}
+                    </p>
+                  </div>
+                ) : step === 'signup' && (
                   <div className="animate-fadeIn">
                     <h2 className="text-2xl font-light mb-6">Join the Waitlist</h2>
                     <SignupForm onSuccess={handleSignupSuccess} />
@@ -115,6 +116,7 @@ function App() {
                       email={userEmail}
                       phone={userPhone}
                       onComplete={handleVerificationComplete}
+                      deliveryNotice={deliveryNotice}
                     />
                   </div>
                 )}

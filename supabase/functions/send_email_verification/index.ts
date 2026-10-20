@@ -2,116 +2,65 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+});
 
-interface EmailRequest {
-  email: string;
-  code: string;
+async function adminRpc(name: string, args: Record<string, unknown>) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("Server configuration missing");
+  const response = await fetch(`${url}/rest/v1/rpc/${name}`, {
+    method: "POST", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  if (!response.ok) throw new Error("Database request failed");
+  return response.json();
+}
+
+function secureCode() {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return String(100000 + value[0] % 900000);
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
-  }
-
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   try {
-    const { email, code }: EmailRequest = await req.json();
-
-    if (!email || !code) {
-      return new Response(
-        JSON.stringify({ error: "Email and code are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const body = await req.json();
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Valid email is required" }, 400);
+    const login = body.login === true || body.login === "true";
+    const resend = body.resend === true || body.resend === "true";
+    let code = typeof body.code === "string" ? body.code : "";
+    if (login || resend) {
+      code = secureCode();
+      const result = await adminRpc(login ? "issue_waitlist_login_code" : "update_waitlist_email_code", {
+        p_email: email, p_code: code,
+      });
+      if (!result?.success) return json({ success: false, message: result?.message ?? "Could not prepare code" }, 429);
     }
+    if (!/^\d{6}$/.test(code)) return json({ error: "A valid code is required" }, 400);
+    const claim = await adminRpc("claim_waitlist_email_delivery", { p_email: email, p_code: code });
+    if (!claim?.success) return json({ success: false, message: "Could not send code. Please wait before trying again." }, 429);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY is not configured");
-    }
-
-    const emailContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
-    .container { max-width: 600px; margin: 40px auto; background: white; padding: 40px; border-radius: 8px; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .brand { font-size: 28px; font-weight: 700; letter-spacing: -1px; margin-bottom: 10px; }
-    .message { color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 30px; }
-    .code-box { background: #f0f0f0; padding: 20px; border-radius: 6px; text-align: center; margin: 30px 0; }
-    .code { font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #000; font-family: 'Courier New', monospace; }
-    .footer { color: #999; font-size: 12px; text-align: center; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="brand">Nervont: Limited Collections</div>
-      <p style="color: #999; margin: 0; font-size: 14px;">Your Early Access Awaits</p>
-    </div>
-    <div class="message">
-      <p>Welcome to the waitlist. Your verification code is:</p>
-    </div>
-    <div class="code-box">
-      <div class="code">${code}</div>
-    </div>
-    <div class="message">
-      <p>Enter this code on our website to complete your email verification. This code expires in 15 minutes.</p>
-    </div>
-    <div class="footer">
-      <p>If you didn't request this code, please ignore this email.</p>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-
+    if (!resendApiKey) throw new Error("Email provider unavailable");
+    const subject = login ? "Your Nervont login code" : "Your Nervont verification code";
     const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
+      method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "verify@nervont.store",
-        to: email,
-        subject: "Your Verification Code",
-        html: emailContent,
+        from: "verify@nervont.store", to: email, subject,
+        html: `<p>Your ${login ? "login" : "verification"} code is <strong>${code}</strong>.</p><p>It expires in 15 minutes. If you did not request it, ignore this email.</p>`,
       }),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Resend API error: ${JSON.stringify(errorData)}`);
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Email verification code sent",
-        email,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: "Failed to send email", details: String(error) }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    if (!response.ok) return json({ error: "Failed to send email. Please try again later." }, 502);
+    return json({ success: true, message: login ? "Login code sent to your email" : "Verification code sent" });
+  } catch {
+    return json({ error: "Failed to send email. Please try again later." }, 500);
   }
 });

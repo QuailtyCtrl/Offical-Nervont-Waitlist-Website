@@ -5,14 +5,15 @@ import { resendEmailCode } from '../lib/verification';
 interface EmailVerificationProps {
   email: string;
   onVerify: (code: string) => Promise<boolean>;
+  allowImmediateResend?: boolean;
 }
 
-export function EmailVerification({ email, onVerify }: EmailVerificationProps) {
+export function EmailVerification({ email, onVerify, allowImmediateResend = false }: EmailVerificationProps) {
   const [codes, setCodes] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(60);
+  const [cooldown, setCooldown] = useState(allowImmediateResend ? 0 : 60);
   const [successMessage, setSuccessMessage] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -68,6 +69,8 @@ export function EmailVerification({ email, onVerify }: EmailVerificationProps) {
         setCodes(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
       }
+    } catch {
+      setError('Could not verify the code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -87,7 +90,7 @@ export function EmailVerification({ email, onVerify }: EmailVerificationProps) {
       } else {
         setError(result.message);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to resend code');
     } finally {
       setResending(false);

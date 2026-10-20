@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ArrowRight, AlertCircle, Mail } from 'lucide-react';
+import { AlertCircle, Mail } from 'lucide-react';
 import { sendLoginCode, verifyLoginCode } from '../lib/verification';
 
 interface LoginFormProps {

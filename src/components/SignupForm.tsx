@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
 import { createWaitlistEntry, checkDuplicateEmail, checkDuplicatePhone, generateVerificationCode, normalizePhone } from '../lib/verification';
 
 interface SignupFormProps {
-  onSuccess: (email: string, phone: string) => void;
+  onSuccess: (email: string, phone: string, deliveryNotice?: string | null) => void;
 }
 
 export function SignupForm({ onSuccess }: SignupFormProps) {
@@ -29,14 +29,17 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
 
   const validatePhone = (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    return digits.length >= 10;
+    return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
   };
 
   const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    const hasCountryCode = digits.length === 11 && digits.startsWith('1');
+    const nationalNumber = hasCountryCode ? digits.slice(1) : digits;
+    const countryPrefix = hasCountryCode ? '+1 ' : '';
+    if (nationalNumber.length <= 3) return `${countryPrefix}${nationalNumber}`;
+    if (nationalNumber.length <= 6) return `${countryPrefix}(${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3)}`;
+    return `${countryPrefix}(${nationalNumber.slice(0, 3)}) ${nationalNumber.slice(3, 6)}-${nationalNumber.slice(6, 10)}`;
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,7 +90,8 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
       const emailCode = generateVerificationCode();
       const smsCode = generateVerificationCode();
 
-      await createWaitlistEntry(email, phone, emailCode, smsCode, referralCode || undefined);
+      const normalizedEmail = email.trim().toLowerCase();
+      await createWaitlistEntry(normalizedEmail, phone, emailCode, smsCode, referralCode || undefined);
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -101,7 +105,7 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
             'Authorization': `Bearer ${anonKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email, code: emailCode }),
+          body: JSON.stringify({ email: normalizedEmail, code: emailCode }),
         }),
       ];
 
@@ -118,18 +122,19 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
         );
       }
 
-      const responses = await Promise.all(requests);
-
-      if (responses.some(r => !r.ok)) {
-        console.error('Verification service error:', await Promise.all(
-          responses.map(async (r, i) =>
-            !r.ok ? await r.text() : 'ok'
-          )
-        ));
-      }
+      const responses = await Promise.allSettled(requests);
+      const deliveryFailed = responses.some(
+        (result) => result.status === 'rejected' || !result.value.ok
+      );
 
       setSuccess(true);
-      onSuccess(email, phone);
+      onSuccess(
+        normalizedEmail,
+        phone,
+        deliveryFailed
+          ? 'Your signup was saved, but a verification message could not be sent. Use the resend button below to try again.'
+          : null
+      );
     } catch (err) {
       setError('Failed to sign up. Please try again.');
       console.error(err);

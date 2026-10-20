@@ -1,14 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? '';
+const configuredAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+function isValidSupabaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.host);
+  } catch {
+    return false;
+  }
+}
+
+export const isSupabaseConfigured = isValidSupabaseUrl(configuredUrl) && Boolean(configuredAnonKey);
+
+export const supabase = createClient(
+  isSupabaseConfigured ? configuredUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? configuredAnonKey : 'placeholder-anon-key'
+);
 
 export interface WaitlistEntry {
   id: string;
   email: string;
-  phone: string;
+  phone: string | null;
   email_verified: boolean;
   sms_verified: boolean;
   email_verification_code: string | null;

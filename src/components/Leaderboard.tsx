@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Crown, Zap } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { getLeaderboard } from '../lib/verification';
+import { getLeaderboard, getWaitlistCount } from '../lib/verification';
 
 interface LeaderboardEntry {
   id: string;
@@ -10,6 +9,7 @@ interface LeaderboardEntry {
   referral_count: number;
   created_at: string;
   position: number;
+  is_current_user: boolean;
 }
 
 interface LeaderboardProps {
@@ -36,44 +36,21 @@ export function Leaderboard({ userEmail, userPosition }: LeaderboardProps) {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
-  useEffect(() => {
-    loadLeaderboard();
-
-    const subscription = supabase
-      .channel('waitlist_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'waitlist',
-        },
-        () => {
-          loadLeaderboard();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     try {
-      const data = await getLeaderboard(50);
+      const [data, count] = await Promise.all([getLeaderboard(50, userEmail), getWaitlistCount()]);
       setEntries(data);
-
-      const { count } = await supabase
-        .from('waitlist')
-        .select('id', { count: 'exact' });
-      setTotalCount(count || 0);
+      setTotalCount(count);
     } catch (error) {
       console.error('Failed to load leaderboard:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [userEmail]);
+
+  useEffect(() => {
+    void loadLeaderboard();
+  }, [loadLeaderboard]);
 
   if (loading) {
     return (
@@ -106,7 +83,7 @@ export function Leaderboard({ userEmail, userPosition }: LeaderboardProps) {
         {entries.map((entry, index) => {
           const colors = tierColors[entry.tier];
           const badge = tierBadges[entry.tier];
-          const isUserEntry = userEmail && entry.email.toLowerCase() === userEmail.toLowerCase();
+          const isUserEntry = entry.is_current_user;
           const isTop5 = index < 5;
 
           return (
@@ -134,7 +111,7 @@ export function Leaderboard({ userEmail, userPosition }: LeaderboardProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${isTop5 ? 'text-gray-900' : 'text-gray-900'}`}>
-                      {entry.email.split('@')[0]}
+                      {entry.email}
                     </p>
                     <p className="text-xs text-gray-600">Joined recently</p>
                   </div>
