@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, WaitlistEntry } from './supabase';
 
 export function generateVerificationCode(): string {
@@ -77,7 +78,15 @@ export async function getUserStats(email: string) {
 
 async function sendCode(functionName: string, body: Record<string, string>): Promise<RpcMessage> {
   const { data, error } = await supabase.functions.invoke(functionName, { body });
-  if (error) return { success: false, message: 'Could not send the code. Please try again shortly.' };
+  if (error) {
+    if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+      const payload = await error.context.clone().json().catch(() => null);
+      const message = typeof payload?.message === 'string' ? payload.message
+        : typeof payload?.error === 'string' ? payload.error : null;
+      if (message) return { success: false, message };
+    }
+    return { success: false, message: 'Could not contact the code-sending service. Please try again shortly.' };
+  }
   return { success: Boolean(data?.success), message: data?.message ?? (data?.success ? 'Code sent successfully' : 'Could not send code') } as RpcMessage;
 }
 
