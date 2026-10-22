@@ -318,8 +318,6 @@ REVOKE ALL ON FUNCTION public.waitlist_user_stats(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.waitlist_leaderboard(integer, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.waitlist_count() FROM PUBLIC;
 
-GRANT EXECUTE ON FUNCTION public.waitlist_email_exists(text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.waitlist_phone_exists(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_waitlist_entry(text, text, text, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_waitlist_email_code(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_waitlist_sms_code(text, text) TO anon, authenticated;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { SignupForm } from './components/SignupForm';
 import { LoginForm } from './components/LoginForm';
@@ -12,6 +12,7 @@ function App() {
   const [step, setStep] = useState<Step>('signup');
   const [userEmail, setUserEmail] = useState('');
   const [userPhone, setUserPhone] = useState('');
+  const [userSessionToken, setUserSessionToken] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
   const [smsVerified, setSmsVerified] = useState(false);
   const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
@@ -19,15 +20,17 @@ function App() {
   const handleSignupSuccess = (email: string, phone: string, notice?: string | null) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setUserSessionToken('');
     setEmailVerified(false);
     setSmsVerified(false);
     setDeliveryNotice(notice ?? null);
     setStep('verification');
   };
 
-  const handleLoginSuccess = (email: string, phone: string, emailVerified: boolean, smsVerified: boolean) => {
+  const handleLoginSuccess = (email: string, phone: string, emailVerified: boolean, smsVerified: boolean, sessionToken: string) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setUserSessionToken(sessionToken);
     setEmailVerified(emailVerified);
     setSmsVerified(smsVerified);
     setDeliveryNotice(null);
@@ -41,9 +44,9 @@ function App() {
     }
   };
 
-  const handleVerificationComplete = () => {
+  const handleVerificationComplete = useCallback(() => {
     setStep('success');
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -123,6 +126,7 @@ function App() {
                       phone={userPhone}
                       initialEmailVerified={emailVerified}
                       initialSmsVerified={smsVerified}
+                      onSessionToken={setUserSessionToken}
                       onComplete={handleVerificationComplete}
                       deliveryNotice={deliveryNotice}
                     />
@@ -131,7 +135,7 @@ function App() {
 
                 {step === 'success' && (
                   <div className="animate-fadeIn">
-                    <SuccessPage email={userEmail} />
+                    <SuccessPage email={userEmail} sessionToken={userSessionToken} />
                   </div>
                 )}
               </div>

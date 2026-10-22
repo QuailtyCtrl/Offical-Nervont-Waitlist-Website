@@ -113,7 +113,9 @@ export function Leaderboard({ userEmail, userPosition }: LeaderboardProps) {
                     <p className={`text-sm font-medium truncate ${isTop5 ? 'text-gray-900' : 'text-gray-900'}`}>
                       {entry.email}
                     </p>
-                    <p className="text-xs text-gray-600">Joined recently</p>
+                    <p className="text-xs text-gray-600">
+                      Joined {new Date(entry.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
                   </div>
                 </div>
 

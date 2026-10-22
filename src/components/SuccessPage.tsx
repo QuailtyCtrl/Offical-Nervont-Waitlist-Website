@@ -14,9 +14,10 @@ interface SuccessStats {
 
 interface SuccessPageProps {
   email: string;
+  sessionToken: string;
 }
 
-export function SuccessPage({ email }: SuccessPageProps) {
+export function SuccessPage({ email, sessionToken }: SuccessPageProps) {
   const [stats, setStats] = useState<SuccessStats | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export function SuccessPage({ email }: SuccessPageProps) {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const userStats = await getUserStats(email);
+        const userStats = await getUserStats(sessionToken);
         setStats(userStats);
       } catch (error) {
         console.error('Failed to load stats:', error);
@@ -34,7 +35,7 @@ export function SuccessPage({ email }: SuccessPageProps) {
     };
 
     loadStats();
-  }, [email]);
+  }, [email, sessionToken]);
 
   const handleCopyLink = async () => {
     const referralLink = `${window.location.origin}?ref=${stats?.referral_code}`;

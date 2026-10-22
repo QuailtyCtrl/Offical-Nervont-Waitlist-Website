@@ -3,7 +3,7 @@ import { AlertCircle, Mail } from 'lucide-react';
 import { sendLoginCode, verifyLoginCode } from '../lib/verification';
 
 interface LoginFormProps {
-  onLoginSuccess: (email: string, phone: string, emailVerified: boolean, smsVerified: boolean) => void;
+  onLoginSuccess: (email: string, phone: string, emailVerified: boolean, smsVerified: boolean, sessionToken: string) => void;
   onBackToSignup: () => void;
 }
 
@@ -95,8 +95,10 @@ export function LoginForm({ onLoginSuccess, onBackToSignup }: LoginFormProps) {
         return;
       }
 
-      if (result.user) {
-        onLoginSuccess(result.user.email, result.user.phone, result.user.email_verified, result.user.sms_verified);
+      if (result.user && result.sessionToken) {
+        onLoginSuccess(result.user.email, result.user.phone, result.user.email_verified, result.user.sms_verified, result.sessionToken);
+      } else {
+        setError('Could not start your session. Please request a new login code.');
       }
     } catch (err) {
       setError('Failed to verify code. Please try again.');

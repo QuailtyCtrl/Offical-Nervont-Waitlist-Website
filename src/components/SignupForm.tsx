@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
-import { createWaitlistEntry, checkDuplicateEmail, checkDuplicatePhone, generateVerificationCode, sendSignupVerificationCodes } from '../lib/verification';
+import { createWaitlistEntry, DuplicateWaitlistEntryError, generateVerificationCode, sendSignupVerificationCodes } from '../lib/verification';
 
 interface SignupFormProps {
   onSuccess: (email: string, phone: string, deliveryNotice?: string | null) => void;
@@ -71,22 +71,6 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
         return;
       }
 
-      const emailExists = await checkDuplicateEmail(email);
-      if (emailExists) {
-        setError('This email is already on the waitlist');
-        setLoading(false);
-        return;
-      }
-
-      if (phone) {
-        const phoneExists = await checkDuplicatePhone(phone);
-        if (phoneExists) {
-          setError('This phone number is already on the waitlist');
-          setLoading(false);
-          return;
-        }
-      }
-
       const emailCode = generateVerificationCode();
       const smsCode = generateVerificationCode();
 
@@ -103,8 +87,12 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
           : null
       );
     } catch (err) {
-      setError('Failed to sign up. Please try again.');
-      console.error(err);
+      if (err instanceof DuplicateWaitlistEntryError) {
+        setError(`${err.message} Try logging in or use different contact details.`);
+      } else {
+        setError('Failed to sign up. Please try again.');
+        console.error(err);
+      }
     } finally {
       setLoading(false);
     }

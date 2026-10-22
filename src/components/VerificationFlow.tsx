@@ -8,12 +8,13 @@ interface VerificationFlowProps {
   email: string;
   phone: string;
   onComplete: () => void;
+  onSessionToken: (token: string) => void;
   deliveryNotice?: string | null;
   initialEmailVerified?: boolean;
   initialSmsVerified?: boolean;
 }
 
-export function VerificationFlow({ email, phone, onComplete, deliveryNotice, initialEmailVerified = false, initialSmsVerified = false }: VerificationFlowProps) {
+export function VerificationFlow({ email, phone, onComplete, onSessionToken, deliveryNotice, initialEmailVerified = false, initialSmsVerified = false }: VerificationFlowProps) {
   const [emailVerified, setEmailVerified] = useState(initialEmailVerified);
   const [smsVerified, setSmsVerified] = useState(initialSmsVerified);
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,7 @@ export function VerificationFlow({ email, phone, onComplete, deliveryNotice, ini
   const handleEmailVerify = async (code: string) => {
     const result = await verifyEmailCode(email, code);
     if (result.success) {
+      if (result.session_token) onSessionToken(result.session_token);
       setEmailVerified(true);
       return true;
     }

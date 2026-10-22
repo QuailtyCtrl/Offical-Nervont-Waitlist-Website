@@ -89,6 +89,7 @@ export function EmailVerification({ email, onVerify, allowImmediateResend = fals
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setError(result.message);
+        if (/wait|recently/i.test(result.message)) setCooldown(60);
       }
     } catch {
       setError('Failed to resend code');

@@ -21,20 +21,14 @@ export function normalizePhone(phone: string): string {
   return digits ? `+${digits}` : '';
 }
 
-type RpcMessage = { success: boolean; message: string; cooldownRemaining?: number };
+type RpcMessage = { success: boolean; message: string; cooldownRemaining?: number; session_token?: string };
+
+export class DuplicateWaitlistEntryError extends Error {}
 
 async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(name, args);
   if (error) throw new Error(error.message);
   return data as T;
-}
-
-export async function checkDuplicateEmail(email: string): Promise<boolean> {
-  return Boolean(await callRpc('waitlist_email_exists', { p_email: email.trim().toLowerCase() }));
-}
-
-export async function checkDuplicatePhone(phone: string): Promise<boolean> {
-  return Boolean(await callRpc('waitlist_phone_exists', { p_phone: normalizePhone(phone) }));
 }
 
 export async function createWaitlistEntry(email: string, phone: string, emailCode: string, smsCode: string, referredByCode?: string) {
@@ -43,6 +37,9 @@ export async function createWaitlistEntry(email: string, phone: string, emailCod
     p_email_code: emailCode, p_sms_code: phone ? smsCode : null,
     p_referred_by_code: referredByCode?.trim() || null,
   });
+  if (error?.code === '23505') {
+    throw new DuplicateWaitlistEntryError('This email or phone number is already on the waitlist.');
+  }
   if (error) throw new Error(error.message);
   // The API intentionally does not return private waitlist columns.
   return { email: email.trim().toLowerCase() } as Pick<WaitlistEntry, 'email'>;
@@ -69,9 +66,9 @@ export async function getWaitlistCount(): Promise<number> {
   return Number(await callRpc('waitlist_count', {}));
 }
 
-export async function getUserStats(email: string) {
+export async function getUserStats(sessionToken: string) {
   const data = await callRpc<{ referral_code: string; tier: WaitlistEntry['tier']; referral_count: number; position: number } | null>(
-    'waitlist_user_stats', { p_email: email.trim().toLowerCase() },
+    'waitlist_user_stats', { p_session_token: sessionToken },
   );
   return data;
 }
@@ -117,10 +114,14 @@ export async function sendLoginCode(email: string): Promise<RpcMessage> {
 }
 
 export async function verifyLoginCode(email: string, code: string): Promise<{
-  success: boolean; message: string; user?: { email: string; phone: string; email_verified: boolean; sms_verified: boolean }
+  success: boolean; message: string; sessionToken?: string; user?: { email: string; phone: string; email_verified: boolean; sms_verified: boolean }
 }> {
-  const result = await callRpc<{ success: boolean; message: string; user?: { email: string; phone: string | null; email_verified: boolean; sms_verified: boolean } }>(
+  const result = await callRpc<{ success: boolean; message: string; session_token?: string; user?: { email: string; phone: string | null; email_verified: boolean; sms_verified: boolean } }>(
     'verify_waitlist_login_code', { p_email: email.trim().toLowerCase(), p_code: code },
   );
-  return { ...result, user: result.user ? { ...result.user, phone: result.user.phone ?? '' } : undefined };
+  return {
+    ...result,
+    sessionToken: result.session_token,
+    user: result.user ? { ...result.user, phone: result.user.phone ?? '' } : undefined,
+  };
 }
