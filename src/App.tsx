@@ -12,11 +12,15 @@ function App() {
   const [step, setStep] = useState<Step>('signup');
   const [userEmail, setUserEmail] = useState('');
   const [userPhone, setUserPhone] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [smsVerified, setSmsVerified] = useState(false);
   const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
 
   const handleSignupSuccess = (email: string, phone: string, notice?: string | null) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setEmailVerified(false);
+    setSmsVerified(false);
     setDeliveryNotice(notice ?? null);
     setStep('verification');
   };
@@ -24,6 +28,8 @@ function App() {
   const handleLoginSuccess = (email: string, phone: string, emailVerified: boolean, smsVerified: boolean) => {
     setUserEmail(email);
     setUserPhone(phone);
+    setEmailVerified(emailVerified);
+    setSmsVerified(smsVerified);
     setDeliveryNotice(null);
 
     const hasPhone = phone && phone.trim() !== '';
@@ -115,6 +121,8 @@ function App() {
                     <VerificationFlow
                       email={userEmail}
                       phone={userPhone}
+                      initialEmailVerified={emailVerified}
+                      initialSmsVerified={smsVerified}
                       onComplete={handleVerificationComplete}
                       deliveryNotice={deliveryNotice}
                     />

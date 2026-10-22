@@ -61,9 +61,6 @@ export function LoginForm({ onLoginSuccess, onBackToSignup }: LoginFormProps) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    if (newCodes.every(c => c !== '') && newCodes.length === 6) {
-      handleVerify(newCodes.join(''));
-    }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -77,9 +74,6 @@ export function LoginForm({ onLoginSuccess, onBackToSignup }: LoginFormProps) {
     const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     const newCodes = text.split('').concat(['', '', '', '', '', '']).slice(0, 6) as string[];
     setCodes(newCodes);
-    if (text.length === 6) {
-      handleVerify(newCodes.join(''));
-    }
   };
 
   const handleVerify = async (fullCode?: string) => {

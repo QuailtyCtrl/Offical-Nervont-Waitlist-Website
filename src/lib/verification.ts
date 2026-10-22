@@ -77,17 +77,23 @@ export async function getUserStats(email: string) {
 }
 
 async function sendCode(functionName: string, body: Record<string, string>): Promise<RpcMessage> {
-  const { data, error } = await supabase.functions.invoke(functionName, { body });
-  if (error) {
-    if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-      const payload = await error.context.clone().json().catch(() => null);
-      const message = typeof payload?.message === 'string' ? payload.message
-        : typeof payload?.error === 'string' ? payload.error : null;
-      if (message) return { success: false, message };
+  try {
+    const { data, error } = await supabase.functions.invoke(functionName, { body });
+    if (error) {
+      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        const payload = await error.context.clone().json().catch(() => null);
+        const message = typeof payload?.message === 'string' ? payload.message
+          : typeof payload?.error === 'string' ? payload.error : null;
+        if (message) return { success: false, message };
+      }
+      return { success: false, message: 'Could not contact the code-sending service. Please try again shortly.' };
     }
+    return { success: Boolean(data?.success), message: data?.message ?? (data?.success ? 'Code sent successfully' : 'Could not send code') } as RpcMessage;
+  } catch {
+    // A network exception here must not make a signup appear unsaved: the
+    // waitlist row may already have been created before delivery was attempted.
     return { success: false, message: 'Could not contact the code-sending service. Please try again shortly.' };
   }
-  return { success: Boolean(data?.success), message: data?.message ?? (data?.success ? 'Code sent successfully' : 'Could not send code') } as RpcMessage;
 }
 
 export async function resendEmailCode(email: string): Promise<RpcMessage> {
@@ -98,6 +104,14 @@ export async function resendSmsCode(phone: string): Promise<RpcMessage> {
   return sendCode('send_sms_verification', { phone: normalizePhone(phone), resend: 'true' });
 }
 
+export async function sendSignupVerificationCodes(email: string, emailCode: string, phone: string, smsCode: string): Promise<string[]> {
+  const results = await Promise.all([
+    sendCode('send_email_verification', { email: email.trim().toLowerCase(), code: emailCode }),
+    ...(phone ? [sendCode('send_sms_verification', { phone: normalizePhone(phone), code: smsCode })] : []),
+  ]);
+  return results.filter((result) => !result.success).map((result) => result.message);
+}
+
 export async function sendLoginCode(email: string): Promise<RpcMessage> {
   return sendCode('send_email_verification', { email: email.trim().toLowerCase(), login: 'true' });
 }
@@ -105,5 +119,8 @@ export async function sendLoginCode(email: string): Promise<RpcMessage> {
 export async function verifyLoginCode(email: string, code: string): Promise<{
   success: boolean; message: string; user?: { email: string; phone: string; email_verified: boolean; sms_verified: boolean }
 }> {
-  return callRpc('verify_waitlist_login_code', { p_email: email.trim().toLowerCase(), p_code: code });
+  const result = await callRpc<{ success: boolean; message: string; user?: { email: string; phone: string | null; email_verified: boolean; sms_verified: boolean } }>(
+    'verify_waitlist_login_code', { p_email: email.trim().toLowerCase(), p_code: code },
+  );
+  return { ...result, user: result.user ? { ...result.user, phone: result.user.phone ?? '' } : undefined };
 }

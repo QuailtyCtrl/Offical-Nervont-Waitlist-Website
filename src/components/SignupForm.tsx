@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
-import { createWaitlistEntry, checkDuplicateEmail, checkDuplicatePhone, generateVerificationCode, normalizePhone } from '../lib/verification';
+import { createWaitlistEntry, checkDuplicateEmail, checkDuplicatePhone, generateVerificationCode, sendSignupVerificationCodes } from '../lib/verification';
 
 interface SignupFormProps {
   onSuccess: (email: string, phone: string, deliveryNotice?: string | null) => void;
@@ -92,47 +92,14 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
 
       const normalizedEmail = email.trim().toLowerCase();
       await createWaitlistEntry(normalizedEmail, phone, emailCode, smsCode, referralCode || undefined);
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const normalizedPhone = phone ? normalizePhone(phone) : '';
-
-      const requests = [
-        fetch(`${supabaseUrl}/functions/v1/send_email_verification`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${anonKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: normalizedEmail, code: emailCode }),
-        }),
-      ];
-
-      if (phone) {
-        requests.push(
-          fetch(`${supabaseUrl}/functions/v1/send_sms_verification`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${anonKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ phone: normalizedPhone, code: smsCode }),
-          })
-        );
-      }
-
-      const responses = await Promise.allSettled(requests);
-      const deliveryFailed = responses.some(
-        (result) => result.status === 'rejected' || !result.value.ok
-      );
+      const deliveryErrors = await sendSignupVerificationCodes(normalizedEmail, emailCode, phone, smsCode);
 
       setSuccess(true);
       onSuccess(
         normalizedEmail,
         phone,
-        deliveryFailed
-          ? 'Your signup was saved, but a verification message could not be sent. Use the resend button below to try again.'
+        deliveryErrors.length > 0
+          ? `Your signup was saved, but a verification message could not be sent: ${deliveryErrors.join(' ')} Use the resend button below to try again.`
           : null
       );
     } catch (err) {

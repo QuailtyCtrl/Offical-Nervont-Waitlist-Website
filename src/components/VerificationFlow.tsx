@@ -9,11 +9,13 @@ interface VerificationFlowProps {
   phone: string;
   onComplete: () => void;
   deliveryNotice?: string | null;
+  initialEmailVerified?: boolean;
+  initialSmsVerified?: boolean;
 }
 
-export function VerificationFlow({ email, phone, onComplete, deliveryNotice }: VerificationFlowProps) {
-  const [emailVerified, setEmailVerified] = useState(false);
-  const [smsVerified, setSmsVerified] = useState(false);
+export function VerificationFlow({ email, phone, onComplete, deliveryNotice, initialEmailVerified = false, initialSmsVerified = false }: VerificationFlowProps) {
+  const [emailVerified, setEmailVerified] = useState(initialEmailVerified);
+  const [smsVerified, setSmsVerified] = useState(initialSmsVerified);
   const [loading, setLoading] = useState(false);
   const hasPhone = phone && phone.trim() !== '';
 

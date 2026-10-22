@@ -251,7 +251,7 @@ BEGIN
   END IF;
   UPDATE public.waitlist SET email_verification_code = p_code,
     email_verification_code_expires_at = now() + interval '15 minutes',
-    email_code_last_sent_at = now(), updated_at = now()
+    updated_at = now()
   WHERE email = lower(trim(p_email));
   RETURN jsonb_build_object('success', true);
 END;
@@ -306,14 +306,14 @@ AS $$ SELECT count(*) FROM public.waitlist; $$;
 REVOKE ALL ON FUNCTION public.waitlist_email_exists(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.waitlist_phone_exists(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_waitlist_entry(text, text, text, text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.update_waitlist_email_code(text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.update_waitlist_sms_code(text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.claim_waitlist_email_delivery(text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.claim_waitlist_sms_delivery(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.update_waitlist_email_code(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_waitlist_sms_code(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.claim_waitlist_email_delivery(text, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.claim_waitlist_sms_delivery(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.verify_waitlist_email_code(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.verify_waitlist_sms_code(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.verify_waitlist_login_code(text, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.issue_waitlist_login_code(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.issue_waitlist_login_code(text, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.waitlist_user_stats(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.waitlist_leaderboard(integer, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.waitlist_count() FROM PUBLIC;
@@ -321,14 +321,14 @@ REVOKE ALL ON FUNCTION public.waitlist_count() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.waitlist_email_exists(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.waitlist_phone_exists(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_waitlist_entry(text, text, text, text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.update_waitlist_email_code(text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.update_waitlist_sms_code(text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_waitlist_email_delivery(text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_waitlist_sms_delivery(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_waitlist_email_code(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_waitlist_sms_code(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_waitlist_login_code(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.waitlist_user_stats(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.waitlist_leaderboard(integer, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.waitlist_count() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.update_waitlist_email_code(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.update_waitlist_sms_code(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.claim_waitlist_email_delivery(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.claim_waitlist_sms_delivery(text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.issue_waitlist_login_code(text, text) TO service_role;
