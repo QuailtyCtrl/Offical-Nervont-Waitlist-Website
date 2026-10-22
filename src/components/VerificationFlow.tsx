@@ -38,7 +38,7 @@ export function VerificationFlow({ email, phone, onComplete, deliveryNotice, ini
       setEmailVerified(true);
       return true;
     }
-    return false;
+    return result.message;
   };
 
   const handleSmsVerify = async (code: string) => {
@@ -47,7 +47,7 @@ export function VerificationFlow({ email, phone, onComplete, deliveryNotice, ini
       setSmsVerified(true);
       return true;
     }
-    return false;
+    return result.message;
   };
 
   const handleSkipSms = () => {

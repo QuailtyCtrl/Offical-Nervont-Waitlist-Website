@@ -4,7 +4,7 @@ import { resendSmsCode } from '../lib/verification';
 
 interface SmsVerificationProps {
   phone: string;
-  onVerify: (code: string) => Promise<boolean>;
+  onVerify: (code: string) => Promise<boolean | string>;
   allowImmediateResend?: boolean;
 }
 
@@ -63,9 +63,9 @@ export function SmsVerification({ phone, onVerify, allowImmediateResend = false 
 
     setLoading(true);
     try {
-      const success = await onVerify(code);
-      if (!success) {
-        setError('Invalid verification code');
+      const result = await onVerify(code);
+      if (result !== true) {
+        setError(typeof result === 'string' ? result : 'Invalid verification code');
         setCodes(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
       }

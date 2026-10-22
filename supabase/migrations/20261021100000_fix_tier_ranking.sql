@@ -50,30 +50,26 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE
-  v_user record;
-  v_position integer := 0;
-  v_tier text;
 BEGIN
-  FOR v_user IN
-    SELECT id, email_verified, sms_verified, referral_count
+  WITH ranked AS (
+    SELECT id, email_verified, sms_verified, referral_count,
+      row_number() OVER (ORDER BY created_at DESC, id ASC) AS rank_number
     FROM public.waitlist
-    ORDER BY created_at DESC, id ASC
-    LIMIT 15
-  LOOP
-    v_position := v_position + 1;
-    IF v_position <= 10 THEN
-      v_tier := 'platinum';
-    ELSIF v_user.referral_count >= 1 THEN
-      v_tier := 'gold';
-    ELSIF v_user.email_verified AND v_user.sms_verified THEN
-      v_tier := 'silver';
-    ELSE
-      v_tier := 'bronze';
-    END IF;
-
-    UPDATE public.waitlist SET tier = v_tier, updated_at = now() WHERE id = v_user.id;
-  END LOOP;
+  ), desired_tiers AS (
+    SELECT id,
+      CASE
+        WHEN rank_number <= 10 THEN 'platinum'
+        WHEN referral_count >= 1 THEN 'gold'
+        WHEN email_verified AND sms_verified THEN 'silver'
+        ELSE 'bronze'
+      END AS tier
+    FROM ranked
+  )
+  UPDATE public.waitlist AS w
+  SET tier = desired_tiers.tier, updated_at = now()
+  FROM desired_tiers
+  WHERE w.id = desired_tiers.id
+    AND w.tier IS DISTINCT FROM desired_tiers.tier;
 END;
 $$;
 
